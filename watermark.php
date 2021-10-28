@@ -29,20 +29,9 @@ if (!defined('_TB_VERSION_')) {
 
 class Watermark extends Module
 {
-    private $_html = '';
-    private $_postErrors = [];
-    private $xaligns = ['left', 'middle', 'right'];
-    private $yaligns = ['top', 'middle', 'bottom'];
-    private $yAlign;
-    private $xAlign;
-    private $transparency;
-    private $imageTypes = [];
-
     /**
      * Watermark constructor.
      *
-     * @throws HTMLPurifier_Exception
-     * @throws PrestaShopDatabaseException
      * @throws PrestaShopException
      */
     public function __construct()
@@ -62,36 +51,6 @@ class Watermark extends Module
         $this->displayName = $this->l('Watermark');
         $this->description = $this->l('Protect image by watermark.');
         $this->confirmUninstall = $this->l('Are you sure you want to delete your details?');
-
-        $config = Configuration::getMultiple([
-            'WATERMARK_TYPES',
-            'WATERMARK_Y_ALIGN',
-            'WATERMARK_X_ALIGN',
-            'WATERMARK_TRANSPARENCY',
-            'WATERMARK_LOGGED',
-            'WATERMARK_HASH'
-        ]);
-        if (!isset($config['WATERMARK_TYPES'])) {
-            $config['WATERMARK_TYPES'] = '';
-        }
-        $tmp = explode(',', $config['WATERMARK_TYPES']);
-        foreach (ImageType::getImagesTypes('products') as $type) {
-            if (in_array($type['id_image_type'], $tmp)) {
-                $this->imageTypes[] = $type;
-            }
-        }
-
-        $this->yAlign = isset($config['WATERMARK_Y_ALIGN']) ? $config['WATERMARK_Y_ALIGN'] : '';
-        $this->xAlign = isset($config['WATERMARK_X_ALIGN']) ? $config['WATERMARK_X_ALIGN'] : '';
-        $this->transparency = isset($config['WATERMARK_TRANSPARENCY']) ? $config['WATERMARK_TRANSPARENCY'] : 60;
-
-        if (!isset($config['WATERMARK_HASH'])) {
-            Configuration::updateValue('WATERMARK_HASH', Tools::passwdGen(10));
-        }
-
-        if (!isset($this->transparency) || !isset($this->xAlign) || !isset($this->yAlign)) {
-            $this->warning = $this->l('Watermark image must be uploaded for this module to work correctly.');
-        }
     }
 
     /**
@@ -140,14 +99,14 @@ class Watermark extends Module
     /**
      * Validate form post
      *
-     * @return bool
+     * @return string[]
      * @throws PrestaShopDatabaseException
      * @throws PrestaShopException
      */
     private function _postValidation()
     {
-        $yalign = Tools::getValue('yalign');
-        $xalign = Tools::getValue('xalign');
+        $yAlign = Tools::getValue('yalign');
+        $xAlign = Tools::getValue('xalign');
         $transparency = (int)(Tools::getValue('transparency'));
 
         $types = ImageType::getImagesTypes('products');
@@ -158,37 +117,42 @@ class Watermark extends Module
             }
         }
 
+        $errors = [];
+
         if (empty($transparency)) {
-            $this->_postErrors[] = $this->l('Opacity required.');
+            $errors[] = $this->l('Opacity required.');
         } elseif ($transparency < 1 || $transparency > 100) {
-            $this->_postErrors[] = $this->l('Opacity is not in allowed range.');
+            $errors[] = $this->l('Opacity is not in allowed range.');
         }
 
-        if (empty($yalign)) {
-            $this->_postErrors[] = $this->l('Y-Align is required.');
-        } elseif (!in_array($yalign, $this->yaligns)) {
-            $this->_postErrors[] = $this->l('Y-Align is not in allowed range.');
+        if (empty($yAlign)) {
+            $errors[] = $this->l('Y-Align is required.');
+        } elseif (!in_array($yAlign, ['top', 'middle', 'bottom'])) {
+            $errors[] = $this->l('Y-Align is not in allowed range.');
         }
 
-        if (empty($xalign)) {
-            $this->_postErrors[] = $this->l('X-Align is required.');
-        } elseif (!in_array($xalign, $this->xaligns)) {
-            $this->_postErrors[] = $this->l('X-Align is not in allowed range.');
+        if (empty($xAlign)) {
+            $errors[] = $this->l('X-Align is required.');
+        } elseif (!in_array($xAlign, ['left', 'middle', 'right'])) {
+            $errors[] = $this->l('X-Align is not in allowed range.');
         }
         if (!count($id_image_type)) {
-            $this->_postErrors[] = $this->l('At least one image type is required.');
+            $errors[] = $this->l('At least one image type is required.');
         }
 
         if (isset($_FILES['PS_WATERMARK']['tmp_name']) && !empty($_FILES['PS_WATERMARK']['tmp_name'])) {
             if (!ImageManager::isRealImage($_FILES['PS_WATERMARK']['tmp_name'], $_FILES['PS_WATERMARK']['type'], ['image/gif'])) {
-                $this->_postErrors[] = $this->l('Image must be in GIF format.');
+                $errors[] = $this->l('Image must be in GIF format.');
             }
         }
 
-        return !count($this->_postErrors) ? true : false;
+        return $errors;
     }
 
     /**
+     * Post process form submit
+     *
+     * @return string | null
      * @throws HTMLPurifier_Exception
      * @throws PrestaShopDatabaseException
      * @throws PrestaShopException
@@ -214,7 +178,8 @@ class Watermark extends Module
         } else {
             $str_shop = '';
         }
-        //submited watermark
+
+        //submitted watermark
         if (isset($_FILES['PS_WATERMARK']) && !empty($_FILES['PS_WATERMARK']['tmp_name'])) {
             /* Check watermark validity */
             if ($error = ImageManager::validateUpload($_FILES['PS_WATERMARK'])) {
@@ -229,18 +194,21 @@ class Watermark extends Module
         }
 
         if ($this->_errors) {
+            $html = '';
             foreach ($this->_errors as $error) {
-                $this->_html .= $this->displayError($this->l($error));
+                $html .= $this->displayError($this->l($error));
             }
+            return $html;
         } else {
             Tools::redirectAdmin('index.php?tab=AdminModules&configure=' . $this->name . '&conf=6&token=' . Tools::getAdminTokenLite('AdminModules'));
         }
+        return null;
     }
 
     /**
      * @return string
      */
-    public function getAdminDir()
+    protected function getAdminDir()
     {
         $admin_dir = str_replace('\\', '/', _PS_ADMIN_DIR_);
         $admin_dir = explode('/', $admin_dir);
@@ -252,7 +220,7 @@ class Watermark extends Module
     /**
      * @return bool
      */
-    public function removeHtaccessSection()
+    protected function removeHtaccessSection()
     {
         $key1 = "\n# start ~ module watermark section";
         $key2 = "# end ~ module watermark section\n";
@@ -274,7 +242,7 @@ class Watermark extends Module
     /**
      *
      */
-    public function writeHtaccessSection()
+    protected function writeHtaccessSection()
     {
         $admin_dir = $this->getAdminDir();
         $source = "\n# start ~ module watermark section
@@ -306,33 +274,31 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
         $this->removeHtaccessSection();
         $this->writeHtaccessSection();
 
-        $this->_html = '';
-
+        $html = '';
         if (Tools::isSubmit('btnSubmit')) {
-            $this->_postValidation();
-            if (!count($this->_postErrors)) {
-                $this->_postProcess();
+            $errors = $this->_postValidation();
+            if (! count($errors)) {
+                $html = $this->_postProcess();
             } else {
-                foreach ($this->_postErrors as $err) {
-                    $this->_html .= $this->displayError($err);
+                foreach ($errors as $err) {
+                    $html .= $this->displayError($err);
                 }
             }
         }
+        $html .= $this->renderForm();
 
-        $this->_html .= $this->renderForm();
-
-        return $this->_html;
+        return $html;
     }
 
 
     /**
-     * Retrocompatibility
+     * Retro-compatibility hook
      *
      * @param $params
      * @throws HTMLPurifier_Exception
      * @throws PrestaShopException
      */
-    public function hookwatermark($params)
+    public function hookWatermark($params)
     {
         $this->hookActionWatermark($params);
     }
@@ -360,22 +326,19 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
         //first make a watermark image
         $return = $this->watermarkByImage(_PS_PROD_IMG_DIR_ . $image->getExistingImgPath() . '.jpg', dirname(__FILE__) . '/' . $this->name . $str_shop . '.gif', $file);
 
-        if (!Configuration::get('WATERMARK_HASH')) {
-            Configuration::updateValue('WATERMARK_HASH', Tools::passwdGen(10));
-        }
-
+        $imageTypes = $this->getWatermarkImageTypes();
         if (isset($params['image_type']) && is_array($params['image_type'])) {
-            $this->imageTypes = array_intersect($this->imageTypes, $params['image_type']);
+            $imageTypes = array_intersect($imageTypes, $params['image_type']);
         }
 
         //go through file formats defined for watermark and resize them
-        foreach ($this->imageTypes as $imageType) {
+        foreach ($imageTypes as $imageType) {
             $newFile = _PS_PROD_IMG_DIR_ . $image->getExistingImgPath() . '-' . stripslashes($imageType['name']) . '.jpg';
             if (!ImageManager::resize($file, $newFile, (int)$imageType['width'], (int)$imageType['height'])) {
                 $return = false;
             }
 
-            $new_file_org = _PS_PROD_IMG_DIR_ . $image->getExistingImgPath() . '-' . stripslashes($imageType['name']) . '-' . Configuration::get('WATERMARK_HASH') . '.jpg';
+            $new_file_org = _PS_PROD_IMG_DIR_ . $image->getExistingImgPath() . '-' . stripslashes($imageType['name']) . '-' . $this->getWatermarkHash() . '.jpg';
             if (!ImageManager::resize($file_org, $new_file_org, (int)$imageType['width'], (int)$imageType['height'])) {
                 $return = false;
             }
@@ -393,40 +356,34 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
      * @return bool
      * @throws PrestaShopException
      */
-    private function watermarkByImage($imagePath, $watermarkPath, $outputPath)
+    protected function watermarkByImage($imagePath, $watermarkPath, $outputPath)
     {
-        $Xoffset = $Yoffset = $xpos = $ypos = 0;
-
         /** @noinspection PhpUnusedLocalVariableInspection */
         list($tmp_width, $tmp_height, $type) = getimagesize($imagePath);
         $image = ImageManager::create($type, $imagePath);
+
         if (!$image) {
             return false;
         }
         if (!$imagew = imagecreatefromgif($watermarkPath)) {
             throw new PrestaShopException('The watermark image is not a real GIF, please CONVERT the image.');
         }
+
         list($watermarkWidth, $watermarkHeight) = getimagesize($watermarkPath);
         list($imageWidth, $imageHeight) = getimagesize($imagePath);
-        if ($this->xAlign == 'middle') {
-            $xpos = $imageWidth / 2 - $watermarkWidth / 2 + $Xoffset;
-        }
-        if ($this->xAlign == 'left') {
-            $xpos = 0 + $Xoffset;
-        }
-        if ($this->xAlign == 'right') {
-            $xpos = $imageWidth - $watermarkWidth - $Xoffset;
-        }
-        if ($this->yAlign == 'middle') {
-            $ypos = $imageHeight / 2 - $watermarkHeight / 2 + $Yoffset;
-        }
-        if ($this->yAlign == 'top') {
-            $ypos = 0 + $Yoffset;
-        }
-        if ($this->yAlign == 'bottom') {
-            $ypos = $imageHeight - $watermarkHeight - $Yoffset;
-        }
-        if (!imagecopymerge($image, $imagew, $xpos, $ypos, 0, 0, $watermarkWidth, $watermarkHeight, $this->transparency)) {
+
+        // merge source and watermark image
+        if (! imagecopymerge(
+            $image,
+            $imagew,
+            $this->getWatermarkXPosition($imageWidth, $watermarkWidth),
+            $this->getWatermarkYPosition($imageHeight, $watermarkHeight),
+            0,
+            0,
+            $watermarkWidth,
+            $watermarkHeight,
+            $this->getWatermarkTransparency())
+        ) {
             return false;
         }
 
@@ -456,7 +413,7 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
      * @throws PrestaShopException
      * @throws SmartyException
      */
-    public function renderForm()
+    protected function renderForm()
     {
         $types = ImageType::getImagesTypes('products');
         foreach ($types as $key => $type) {
@@ -600,11 +557,11 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
      * @throws PrestaShopDatabaseException
      * @throws PrestaShopException
      */
-    public function getConfigFieldsValues()
+    protected function getConfigFieldsValues()
     {
         $config_fields = [
-            'PS_WATERMARK' => Tools::getValue('PS_WATERMARK', Configuration::get('PS_WATERMARK')),
-            'transparency' => Tools::getValue('transparency', Configuration::get('WATERMARK_TRANSPARENCY')),
+            'PS_WATERMARK' => '',
+            'transparency' => Tools::getValue('transparency', $this->getWatermarkTransparency()),
             'xalign' => Tools::getValue('xalign', Configuration::get('WATERMARK_X_ALIGN')),
             'yalign' => Tools::getValue('yalign', Configuration::get('WATERMARK_Y_ALIGN')),
             'WATERMARK_LOGGED' => Tools::getValue('WATERMARK_LOGGED', Configuration::get('WATERMARK_LOGGED')),
@@ -644,5 +601,107 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
         }
 
         return $config_fields;
+    }
+
+    /**
+     * Returns watermark transparency value
+     *
+     * @return int
+     * @throws PrestaShopException
+     */
+    protected function getWatermarkTransparency()
+    {
+        $transparency = (int)Configuration::get('WATERMARK_TRANSPARENCY');
+        if ($transparency < 1 || $transparency > 100) {
+            return 60;
+        }
+        return $transparency;
+    }
+
+    /**
+     * Returns image types selected for watermark
+     *
+     * @throws PrestaShopDatabaseException
+     * @throws PrestaShopException
+     */
+    protected function getWatermarkImageTypes()
+    {
+        static $imageTypes = null;
+        if (is_null($imageTypes)) {
+            $types = Configuration::get('WATERMARK_TYPES');
+            if ($types) {
+                $types = explode(',', $types);
+            } else {
+                $types = [];
+            }
+            $imageTypes = [];
+            foreach (ImageType::getImagesTypes('products') as $type) {
+                if (in_array($type['id_image_type'], $types)) {
+                    $imageTypes[] = $type;
+                }
+            }
+        }
+        return $imageTypes;
+    }
+
+    /**
+     * Returns watermark secret hash, used for direct image access
+     *
+     * @return string
+     * @throws HTMLPurifier_Exception
+     * @throws PrestaShopException
+     */
+    protected function getWatermarkHash()
+    {
+        $hash = Configuration::get('WATERMARK_HASH');
+        if (! $hash) {
+            $hash = Tools::passwdGen(10);
+            Configuration::updateValue('WATERMARK_HASH', $hash);
+        }
+        return $hash;
+    }
+
+    /**
+     * Returns x position of watermark
+     *
+     * @param int $imageWidth
+     * @param int $watermarkWidth
+     * @return float | int
+     * @throws PrestaShopException
+     */
+    protected function getWatermarkXPosition($imageWidth, $watermarkWidth)
+    {
+        $xAlign = Configuration::get('WATERMARK_X_ALIGN');
+        switch ($xAlign) {
+            case 'middle':
+                return $imageWidth / 2 - $watermarkWidth / 2;
+            case 'left':
+                return 0;
+            case 'right':
+            default:
+                return $imageWidth - $watermarkWidth;
+        }
+    }
+
+    /**
+     * Returns y position of watermark
+     *
+     * @param int $imageHeight
+     * @param int $watermarkHeight
+     * @return float|int
+     * @throws PrestaShopException
+     */
+    protected function getWatermarkYPosition($imageHeight, $watermarkHeight)
+    {
+        $yAlign = Configuration::get('WATERMARK_Y_ALIGN');
+        switch ($yAlign) {
+            case 'middle':
+                return $imageHeight / 2 - $watermarkHeight / 2;
+            case 'top':
+                return 0;
+            case 'bottom':
+            default:
+                return $imageHeight - $watermarkHeight;
+        }
     }
 }
