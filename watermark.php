@@ -312,10 +312,16 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
      */
     public function hookActionWatermark($params)
     {
+        $extensions = ['jpg'];
+        if (ImageManager::webpSupport()) {
+            $extensions[] = 'webp';
+        }
+
         $image = new Image($params['id_image']);
         $image->id_product = $params['id_product'];
-        $file = _PS_PROD_IMG_DIR_ . $image->getExistingImgPath() . '-watermark.jpg';
-        $file_org = _PS_PROD_IMG_DIR_ . $image->getExistingImgPath() . '.jpg';
+        $pathPrefix = _PS_PROD_IMG_DIR_ . $image->getExistingImgPath();
+        $file = $pathPrefix . '-watermark.jpg';
+        $fileOrig = $pathPrefix . '.jpg';
 
         if (Shop::getContext() != Shop::CONTEXT_SHOP) {
             $watermarkImage = static::getWatermarkImagePath($this->context->shop->id);
@@ -333,7 +339,7 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
 
         //first make a watermark image
         $return = $this->watermarkByImage(
-            _PS_PROD_IMG_DIR_ . $image->getExistingImgPath() . '.jpg',
+            $fileOrig,
             $watermarkImage,
             $file
         );
@@ -343,16 +349,22 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
             $imageTypes = array_intersect($imageTypes, $params['image_type']);
         }
 
+
         //go through file formats defined for watermark and resize them
         foreach ($imageTypes as $imageType) {
-            $newFile = _PS_PROD_IMG_DIR_ . $image->getExistingImgPath() . '-' . stripslashes($imageType['name']) . '.jpg';
-            if (!ImageManager::resize($file, $newFile, (int)$imageType['width'], (int)$imageType['height'])) {
-                $return = false;
-            }
+            $width = (int)$imageType['width'];
+            $height = (int)$imageType['height'];
+            $imageTypeName = stripslashes($imageType['name']);
+            foreach ($extensions as $extension) {
+                $newFile = $pathPrefix . '-' . $imageTypeName . '.' . $extension;
+                if (!ImageManager::resize($file, $newFile, $width, $height, $extension)) {
+                    $return = false;
+                }
 
-            $new_file_org = _PS_PROD_IMG_DIR_ . $image->getExistingImgPath() . '-' . stripslashes($imageType['name']) . '-' . $this->getWatermarkHash() . '.jpg';
-            if (!ImageManager::resize($file_org, $new_file_org, (int)$imageType['width'], (int)$imageType['height'])) {
-                $return = false;
+                $newFileHash = $pathPrefix . '-' . $imageTypeName . '-' . $this->getWatermarkHash() . '.' . $extension;
+                if (!ImageManager::resize($fileOrig, $newFileHash, $width, $height, $extension)) {
+                    $return = false;
+                }
             }
         }
 
