@@ -313,7 +313,8 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
     public function hookActionWatermark($params)
     {
         $extensions = ['jpg'];
-        if (ImageManager::webpSupport()) {
+
+        if ($this->supportsWebp()) {
             $extensions[] = 'webp';
         }
 
@@ -788,5 +789,22 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
     public static function normalizePath($dir)
     {
        return rtrim(str_replace('\\', '/', $dir), '/') . '/';
+    }
+
+    /**
+     * Returns true, if thirty bees supports webp images
+     *
+     * @return bool
+     */
+    protected function supportsWebp()
+    {
+        if (ImageManager::webpSupport()) {
+            return true;
+        }
+        if (method_exists(ImageManager::class, 'generateWebpImages')) {
+            return ImageManager::generateWebpImages();
+        }
+        return false;
+
     }
 }
