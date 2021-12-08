@@ -38,7 +38,7 @@ class Watermark extends Module
     {
         $this->name = 'watermark';
         $this->tab = 'administration';
-        $this->version = '1.2.0';
+        $this->version = '1.2.1';
         $this->author = 'thirty bees';
         $this->need_instance = false;
         $this->tb_versions_compliancy = '>= 1.0.0';
@@ -57,7 +57,6 @@ class Watermark extends Module
      * Module install functiton
      *
      * @return bool
-     * @throws Adapter_Exception
      * @throws HTMLPurifier_Exception
      * @throws PrestaShopDatabaseException
      * @throws PrestaShopException
@@ -183,9 +182,7 @@ class Watermark extends Module
             } else {
                 /* Copy new watermark */
                 $source = $_FILES['PS_WATERMARK']['tmp_name'];
-                $target = Shop::getContext() == Shop::CONTEXT_SHOP
-                    ? static::getWatermarkImagePath($this->context->shop->id)
-                    : static::getWatermarkImagePath();
+                $target = static::getWatermarkImagePath();
 
                 if (! @copy($source, $target)) {
                     $errors[] = sprintf($this->l('An error occurred while uploading watermark: %1$s to %2$s'), $source, $target);
@@ -258,7 +255,6 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
      * Module configuration page
      *
      * @return string
-     * @throws Adapter_Exception
      * @throws HTMLPurifier_Exception
      * @throws PrestaShopDatabaseException
      * @throws PrestaShopException
@@ -324,14 +320,7 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
         $file = $pathPrefix . '-watermark.jpg';
         $fileOrig = $pathPrefix . '.jpg';
 
-        if (Shop::getContext() != Shop::CONTEXT_SHOP) {
-            $watermarkImage = static::getWatermarkImagePath($this->context->shop->id);
-            if (! file_exists($watermarkImage)) {
-                $watermarkImage = static::getWatermarkImagePath();
-            }
-        } else {
-            $watermarkImage = static::getWatermarkImagePath();
-        }
+        $watermarkImage = static::getWatermarkImagePath();
 
         // if watermark image is not defined, do nothing
         if (! file_exists($watermarkImage)) {
@@ -433,7 +422,6 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
      * Returns configuration form
      *
      * @return string
-     * @throws Adapter_Exception
      * @throws PrestaShopDatabaseException
      * @throws PrestaShopException
      * @throws SmartyException
@@ -443,12 +431,6 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
         $types = ImageType::getImagesTypes('products');
         foreach ($types as $key => $type) {
             $types[$key]['label'] = $type['name'] . ' (' . $type['width'] . ' x ' . $type['height'] . ')';
-        }
-
-        if (Shop::getContext() == Shop::CONTEXT_SHOP) {
-            $thumb = static::getWatermarkImageUri($this->context->shop->id);
-        } else {
-            $thumb = static::getWatermarkImageUri();
         }
 
         $fields_form = [
@@ -464,7 +446,7 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
                         'label' => $this->l('Watermark file:'),
                         'name' => 'PS_WATERMARK',
                         'desc' => $this->l('Must be in GIF format'),
-                        'thumb' => $thumb
+                        'thumb' => static::getWatermarkImageUri()
                     ],
                     [
                         'type' => 'text',
@@ -608,13 +590,13 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
 
         //get images type from Configuration
         $id_image_type_config = [];
-        if ($confs = Configuration::get('WATERMARK_TYPES')) {
-            $confs = explode(',', Configuration::get('WATERMARK_TYPES'));
+        if ($configuration = Configuration::get('WATERMARK_TYPES')) {
+            $configuration = explode(',', $configuration);
         } else {
-            $confs = [];
+            $configuration = [];
         }
 
-        foreach ($confs as $conf) {
+        foreach ($configuration as $conf) {
             $id_image_type_config['WATERMARK_TYPES_' . (int)$conf] = true;
         }
 
@@ -745,34 +727,20 @@ RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
     /**
      * Returns image path for watermark image, in given shop context
      *
-     * @param int $idShop
      * @return string
      */
-    protected static function getWatermarkImagePath($idShop = null)
+    public static function getWatermarkImagePath()
     {
-        $idShop = (int)$idShop;
-        if ($idShop) {
-            $shopSuffix = '-' . $idShop;
-        } else {
-            $shopSuffix = '';
-        }
-        return static::normalizePath(_PS_IMG_DIR_) . 'watermark' . $shopSuffix . '.gif';
+        return static::normalizePath(_PS_IMG_DIR_) . 'watermark.gif';
     }
 
     /**
-     * Returns image uri for watermark image, in given shop context
+     * Returns image uri for watermark image
      *
-     * @param int $idShop
      * @return string
      */
-    protected static function getWatermarkImageUri($idShop = null)
+    protected static function getWatermarkImageUri()
     {
-        // first look if there is specific image for given shop
-        $idShop = (int)$idShop;
-        if ($idShop && file_exists(static::getWatermarkImagePath($idShop))) {
-            return _PS_IMG_ . 'watermark-' . $idShop . '.gif';
-        }
-        // if not, return image for all shops
         if (file_exists(static::getWatermarkImagePath())) {
             return _PS_IMG_ . 'watermark.gif';
         }
