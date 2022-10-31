@@ -237,15 +237,18 @@ class Watermark extends Module
      */
     protected function writeHtaccessSection()
     {
-        $admin_dir = $this->getAdminDir();
-        $source = "\n# start ~ module watermark section
-<IfModule mod_rewrite.c>
-RewriteEngine On
-RewriteCond expr \"! %{HTTP_REFERER} -strmatch '*://%{HTTP_HOST}*/$admin_dir/*'\"
-RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]
-</IfModule>
-# end ~ module watermark section\n";
-
+        $adminDir = $this->getAdminDir();
+        $source = "\n# start ~ module watermark section\n";
+        $source .= "<IfModule mod_rewrite.c>\n";
+        $source .= "RewriteEngine On\n";
+        $source .= "RewriteCond expr \"! %{HTTP_REFERER} -strmatch '*://%{HTTP_HOST}*/$adminDir/*'\"\n";
+        $source .= "RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]\n";
+        if ($this->supportsWebp()) {
+            $source .= "RewriteCond expr \"! %{HTTP_REFERER} -strmatch '*://%{HTTP_HOST}*/$adminDir/*'\"\n";
+            $source .= "RewriteRule [0-9/]+/[0-9]+\\.webp$ - [F]\n";
+        }
+        $source .= "</IfModule>\n";
+        $source .= "# end ~ module watermark section\n";
         $path = _PS_ROOT_DIR_ . '/.htaccess';
         file_put_contents($path, $source . file_get_contents($path));
     }
