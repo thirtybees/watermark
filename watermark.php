@@ -29,6 +29,9 @@ if (!defined('_TB_VERSION_')) {
 
 class Watermark extends Module
 {
+    const START_WATERMARK_SECTION = "# start ~ module watermark section";
+    const END_WATERMARK_SECTION = "# end ~ module watermark section";
+
     /**
      * Watermark constructor.
      *
@@ -211,25 +214,45 @@ class Watermark extends Module
     }
 
     /**
-     * @return bool
+     * @return void
      */
     protected function removeHtaccessSection()
     {
-        $key1 = "\n# start ~ module watermark section";
-        $key2 = "# end ~ module watermark section\n";
         $path = _PS_ROOT_DIR_ . '/.htaccess';
         if (file_exists($path) && is_writable($path)) {
-            $s = file_get_contents($path);
-            $p1 = strpos($s, $key1);
-            $p2 = strpos($s, $key2, $p1);
-            if ($p1 === false || $p2 === false) {
-                return false;
+            $oldContent = file_get_contents($path);
+            $newContent = $this->removeHtaccessSections($oldContent);
+            if ($oldContent !== $newContent) {
+                file_put_contents($path, $newContent);
             }
-            $s = substr($s, 0, $p1) . substr($s, $p2 + strlen($key2));
-            file_put_contents($path, $s);
         }
+    }
 
-        return true;
+    /**
+     * Removes all watermark sections from .htaccess
+     * There should exists only one, but better be sure
+     *
+     * @param string $content
+     * @return string
+     */
+    protected function removeHtaccessSections($content)
+    {
+        while (true) {
+            $p1 = strpos($content, static::START_WATERMARK_SECTION);
+            if ($p1 === false) {
+                return $content;
+            }
+            $p2 = strpos($content, static::END_WATERMARK_SECTION, $p1);
+            if ($p2 === false) {
+                return $content;
+            }
+            $before = trim(substr($content, 0, $p1));
+            $after = trim(substr($content, $p2 + strlen(static::END_WATERMARK_SECTION)));
+            if ($before) {
+                $before .= "\n";
+            }
+            $content = $before . $after;
+        }
     }
 
     /**
@@ -238,7 +261,7 @@ class Watermark extends Module
     protected function writeHtaccessSection()
     {
         $adminDir = $this->getAdminDir();
-        $source = "\n# start ~ module watermark section\n";
+        $source = static::START_WATERMARK_SECTION . "\n";
         $source .= "<IfModule mod_rewrite.c>\n";
         $source .= "RewriteEngine On\n";
         $source .= "RewriteCond expr \"! %{HTTP_REFERER} -strmatch '*://%{HTTP_HOST}*/$adminDir/*'\"\n";
@@ -248,7 +271,7 @@ class Watermark extends Module
             $source .= "RewriteRule [0-9/]+/[0-9]+\\.webp$ - [F]\n";
         }
         $source .= "</IfModule>\n";
-        $source .= "# end ~ module watermark section\n";
+        $source .= static::END_WATERMARK_SECTION . "\n\n";
         $path = _PS_ROOT_DIR_ . '/.htaccess';
         file_put_contents($path, $source . file_get_contents($path));
     }
