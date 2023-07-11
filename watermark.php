@@ -360,7 +360,11 @@ class Watermark extends Module
 
         $imageTypes = $this->getWatermarkImageTypes();
         if (isset($params['image_type']) && is_array($params['image_type'])) {
-            $imageTypes = array_intersect($imageTypes, $params['image_type']);
+            $imageTypes = array_uintersect($imageTypes, $params['image_type'], function($a, $b) {
+                $id1 = (int)$a['id_image_type'];
+                $id2 = (int)$b['id_image_type'];
+                return $id1 - $id2;
+            });
         }
 
 
@@ -653,6 +657,8 @@ class Watermark extends Module
 
     /**
      * Returns image types selected for watermark
+     *
+     * @return string[]
      *
      * @throws PrestaShopDatabaseException
      * @throws PrestaShopException
