@@ -60,7 +60,6 @@ class Watermark extends Module
      * Module install functiton
      *
      * @return bool
-     * @throws HTMLPurifier_Exception
      * @throws PrestaShopDatabaseException
      * @throws PrestaShopException
      */
@@ -156,7 +155,6 @@ class Watermark extends Module
      * Post process form submit
      *
      * @return string[]
-     * @throws HTMLPurifier_Exception
      * @throws PrestaShopDatabaseException
      * @throws PrestaShopException
      */
@@ -280,7 +278,6 @@ class Watermark extends Module
      * Module configuration page
      *
      * @return string
-     * @throws HTMLPurifier_Exception
      * @throws PrestaShopDatabaseException
      * @throws PrestaShopException
      * @throws SmartyException
@@ -315,7 +312,8 @@ class Watermark extends Module
      * Retro-compatibility hook
      *
      * @param $params
-     * @throws HTMLPurifier_Exception
+     *
+     * @throws PrestaShopDatabaseException
      * @throws PrestaShopException
      */
     public function hookWatermark($params)
@@ -327,8 +325,9 @@ class Watermark extends Module
      * Watermark hook
      *
      * @param $params
+     *
      * @return bool
-     * @throws HTMLPurifier_Exception
+     * @throws PrestaShopDatabaseException
      * @throws PrestaShopException
      */
     public function hookActionWatermark($params)
@@ -563,6 +562,8 @@ class Watermark extends Module
             ],
         ];
 
+        /** @var AdminController $controller */
+        $controller = $this->context->controller;
         $helper = new HelperForm();
         $helper->show_toolbar = false;
         $helper->table = $this->table;
@@ -575,7 +576,7 @@ class Watermark extends Module
         $helper->token = Tools::getAdminTokenLite('AdminModules');
         $helper->tpl_vars = [
             'fields_value' => $this->getConfigFieldsValues(),
-            'languages' => $this->context->controller->getLanguages(),
+            'languages' => $controller->getLanguages(),
             'id_language' => $this->context->language->id
         ];
 
@@ -680,7 +681,6 @@ class Watermark extends Module
      * Returns watermark secret hash, used for direct image access
      *
      * @return string
-     * @throws HTMLPurifier_Exception
      * @throws PrestaShopException
      */
     protected function getWatermarkHash()
