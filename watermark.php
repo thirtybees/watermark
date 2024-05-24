@@ -142,7 +142,7 @@ class Watermark extends Module
             $errors[] = $this->l('At least one image type is required.');
         }
 
-        if (isset($_FILES['PS_WATERMARK']['tmp_name']) && !empty($_FILES['PS_WATERMARK']['tmp_name'])) {
+        if (!empty($_FILES['PS_WATERMARK']['tmp_name'])) {
             if (!ImageManager::isRealImage($_FILES['PS_WATERMARK']['tmp_name'], $_FILES['PS_WATERMARK']['type'], ['image/gif'])) {
                 $errors[] = $this->l('Image must be in GIF format.');
             }
@@ -407,6 +407,7 @@ class Watermark extends Module
         if (!$image) {
             return false;
         }
+
         if (!$imagew = imagecreatefromgif($watermarkPath)) {
             throw new PrestaShopException('The watermark image is not a real GIF, please CONVERT the image.');
         }
@@ -644,6 +645,7 @@ class Watermark extends Module
      * Returns watermark transparency value
      *
      * @return int
+     *
      * @throws PrestaShopException
      */
     protected function getWatermarkTransparency()
@@ -704,7 +706,9 @@ class Watermark extends Module
      *
      * @param int $imageWidth
      * @param int $watermarkWidth
-     * @return float | int
+     *
+     * @return int
+     *
      * @throws PrestaShopException
      */
     protected function getWatermarkXPosition($imageWidth, $watermarkWidth)
@@ -712,12 +716,12 @@ class Watermark extends Module
         $xAlign = Configuration::get('WATERMARK_X_ALIGN');
         switch ($xAlign) {
             case 'middle':
-                return $imageWidth / 2 - $watermarkWidth / 2;
+                return max(0, (int)round($imageWidth / 2 - $watermarkWidth / 2));
             case 'left':
                 return 0;
             case 'right':
             default:
-                return $imageWidth - $watermarkWidth;
+                return max(0, (int)($imageWidth - $watermarkWidth));
         }
     }
 
@@ -726,7 +730,9 @@ class Watermark extends Module
      *
      * @param int $imageHeight
      * @param int $watermarkHeight
-     * @return float|int
+     *
+     * @return int
+     *
      * @throws PrestaShopException
      */
     protected function getWatermarkYPosition($imageHeight, $watermarkHeight)
@@ -734,12 +740,12 @@ class Watermark extends Module
         $yAlign = Configuration::get('WATERMARK_Y_ALIGN');
         switch ($yAlign) {
             case 'middle':
-                return $imageHeight / 2 - $watermarkHeight / 2;
+                return max(0, (int)round($imageHeight / 2 - $watermarkHeight / 2));
             case 'top':
                 return 0;
             case 'bottom':
             default:
-                return $imageHeight - $watermarkHeight;
+                return max(0, (int)($imageHeight - $watermarkHeight));
         }
     }
 
