@@ -44,8 +44,8 @@ class Watermark extends Module
         $this->version = '1.2.4';
         $this->author = 'thirty bees';
         $this->need_instance = false;
-        $this->tb_versions_compliancy = '>= 1.0.0';
-        $this->tb_min_version = '1.0.0';
+        $this->tb_versions_compliancy = '>= 1.6.0';
+        $this->tb_min_version = '1.6.0';
 		$this->ps_versions_compliancy = ['min' => '1.6', 'max' => _PS_VERSION_];
 
         $this->bootstrap = true;
