@@ -254,20 +254,18 @@ class Watermark extends Module
     }
 
     /**
-     *
+     * @throws PrestaShopDatabaseException
+     * @throws PrestaShopException
      */
     protected function writeHtaccessSection()
     {
+        $extension = ImageManager::getDefaultImageExtension();
         $adminDir = $this->getAdminDir();
         $source = static::START_WATERMARK_SECTION . "\n";
         $source .= "<IfModule mod_rewrite.c>\n";
         $source .= "RewriteEngine On\n";
         $source .= "RewriteCond expr \"! %{HTTP_REFERER} -strmatch '*://%{HTTP_HOST}*/$adminDir/*'\"\n";
-        $source .= "RewriteRule [0-9/]+/[0-9]+\\.jpg$ - [F]\n";
-        if ($this->supportsWebp()) {
-            $source .= "RewriteCond expr \"! %{HTTP_REFERER} -strmatch '*://%{HTTP_HOST}*/$adminDir/*'\"\n";
-            $source .= "RewriteRule [0-9/]+/[0-9]+\\.webp$ - [F]\n";
-        }
+        $source .= "RewriteRule [0-9/]+/[0-9]+\\.".$extension."$ - [F]\n";
         $source .= "</IfModule>\n";
         $source .= static::END_WATERMARK_SECTION . "\n\n";
         $path = _PS_ROOT_DIR_ . '/.htaccess';
@@ -332,17 +330,16 @@ class Watermark extends Module
      */
     public function hookActionWatermark($params)
     {
-        $extensions = ['jpg'];
-
-        if ($this->supportsWebp()) {
-            $extensions[] = 'webp';
-        }
-
         $image = new Image($params['id_image']);
         $image->id_product = $params['id_product'];
         $pathPrefix = _PS_PROD_IMG_DIR_ . $image->getExistingImgPath();
-        $file = $pathPrefix . '-watermark.jpg';
-        $fileOrig = $pathPrefix . '.jpg';
+        $fileOrig = $this->getSourceImagePath($image);
+        if (! $fileOrig) {
+            return false;
+        }
+
+        $extension = ImageManager::getDefaultImageExtension();
+        $file = $pathPrefix . '-watermark.' . $extension;
 
         $watermarkImage = static::getWatermarkImagePath();
 
@@ -373,16 +370,14 @@ class Watermark extends Module
             $width = (int)$imageType['width'];
             $height = (int)$imageType['height'];
             $imageTypeName = stripslashes($imageType['name']);
-            foreach ($extensions as $extension) {
-                $newFile = $pathPrefix . '-' . $imageTypeName . '.' . $extension;
-                if (!ImageManager::resize($file, $newFile, $width, $height, $extension)) {
-                    $return = false;
-                }
+            $newFile = $pathPrefix . '-' . $imageTypeName . '.' . $extension;
+            if (!ImageManager::resize($file, $newFile, $width, $height, $extension)) {
+                $return = false;
+            }
 
-                $newFileHash = $pathPrefix . '-' . $imageTypeName . '-' . $this->getWatermarkHash() . '.' . $extension;
-                if (!ImageManager::resize($fileOrig, $newFileHash, $width, $height, $extension)) {
-                    $return = false;
-                }
+            $newFileHash = $pathPrefix . '-' . $imageTypeName . '-' . $this->getWatermarkHash() . '.' . $extension;
+            if (!ImageManager::resize($fileOrig, $newFileHash, $width, $height, $extension)) {
+                $return = false;
             }
         }
 
@@ -430,21 +425,10 @@ class Watermark extends Module
             return false;
         }
 
-        switch ($type) {
-            case IMAGETYPE_PNG:
-                $type = 'png';
-                break;
-            case IMAGETYPE_GIF:
-                $type = 'gif';
-                break;
-            case IMAGETYPE_JPEG:
-                $type = 'jpg';
-                break;
-        }
-
+        $extension = pathinfo($imagePath, PATHINFO_EXTENSION);
         imagealphablending($image, false);
         imagesavealpha($image, true);
-        return ImageManager::write($type, $image, $outputPath);
+        return ImageManager::write($extension, $image, $outputPath);
     }
 
     /**
@@ -797,19 +781,14 @@ class Watermark extends Module
     }
 
     /**
-     * Returns true, if thirty bees supports webp images
+     * @param Image $image
      *
-     * @return bool
+     * @return string
+     *
+     * @throws PrestaShopException
      */
-    protected function supportsWebp()
+    protected function getSourceImagePath(Image $image): string
     {
-        if (ImageManager::webpSupport()) {
-            return true;
-        }
-        if (method_exists(ImageManager::class, 'generateWebpImages')) {
-            return ImageManager::generateWebpImages();
-        }
-        return false;
-
+        return ImageManager::getSourceImage(_PS_PROD_IMG_DIR_ . $image->getImgFolder(), (string)$image->id);
     }
 }
