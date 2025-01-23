@@ -41,7 +41,7 @@ class Watermark extends Module
     {
         $this->name = 'watermark';
         $this->tab = 'administration';
-        $this->version = '1.2.4';
+        $this->version = '1.2.5';
         $this->author = 'thirty bees';
         $this->need_instance = false;
         $this->tb_versions_compliancy = '>= 1.6.0';
